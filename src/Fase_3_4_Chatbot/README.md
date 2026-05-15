@@ -1,0 +1,35 @@
+# Phases 3 and 4: Intelligent Agent and Conversational Interface
+
+## Overview
+This stage represents the architectural transition from exploratory interactive notebooks (Jupyter) to a production-ready server application. The system integrates the AnyLogistix API logic into a multi-agent framework, providing a conversational web interface capable of autonomous logistical reasoning and task execution.
+
+## Phase 3: Modularization and Agent Logic (The Core)
+The objective of Phase 3 was to refactor the procedural scripts developed in earlier phases into a modular architecture compatible with Large Language Model (LLM) agents.
+
+### 1. API Toolset Modularization (`alx_tools.py`)
+The logic for connection, simulation, data extraction, and scenario manipulation was encapsulated into atomic Python functions.
+* **Dynamic Connection Management:** Programmatic handling of authentication and SSL verification bypass.
+* **Workflow Automation:** Methods to clone scenarios, trigger synchronous experiments, and manage the multi-step dashboard export process.
+* **Excel Data Manipulation:** Integration of the `xlwings` library to programmatically inject AI-determined values into AnyLogistix Excel templates before re-importing them into the server.
+
+### 2. LangChain Orchestration (`agent.py`)
+An LLM was configured as the central decision-making engine.
+* **Tool Binding:** Functions from `alx_tools.py` were exposed to the LLM using the `@tool` decorator, accompanied by precise docstrings.
+* **Autonomous Reasoning:** The agent utilizes these definitions to interpret natural language requests, determine the required sequence of logistical tools, and execute them dynamically.
+
+## Phase 4: Conversational Interface (`app.py`)
+Phase 4 focused on deploying a user-facing frontend to democratize access to the simulation engine without requiring direct interaction with the AnyLogistix GUI.
+
+### Chainlit Framework Integration
+The system leverages the Chainlit framework to provide a modern, web-based chat interface.
+* **Session Management:** Utilization of `cl.user_session` to maintain conversational memory and context across multiple interactions.
+* **Real-time Execution Logging:** Visual feedback is provided to the user during intermediate tool executions, an essential feature given the latency of Virtual Machine simulation processing.
+* **Asynchronous Processing:** The application handles asynchronous messaging to ensure UI responsiveness while communicating with the external REST API.
+
+## Directory Structure
+* `alx_tools.py`: Core module containing API request functions and Excel manipulation logic.
+* `agent.py`: LangChain agent configuration, prompt engineering, and tool bindings.
+* `app.py`: Chainlit application entry point and user interface definitions.
+* `chainlit.md`: Custom welcome screen configuration for the chatbot UI.
+* `/Archivos`: Local storage directory for base and modified Excel scenario templates.
+* `/Resultados_IA`: Repository for the `.xlsx` simulation dashboard results extracted by the agent.
