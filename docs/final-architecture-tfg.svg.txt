@@ -1,0 +1,118 @@
+import React, { useRef } from 'react';
+
+export default function ArchitectureDiagram() {
+  const svgRef = useRef(null);
+
+  const downloadSVG = () => {
+    const svgNode = svgRef.current;
+    const svgData = new XMLSerializer().serializeToString(svgNode);
+    const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "final-architecture-tfg.svg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 p-8 font-sans">
+      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+        
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold text-slate-800 font-sans">Final System Architecture</h2>
+          <button 
+            onClick={downloadSVG} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-semibold transition-colors shadow-sm"
+          >
+            Download SVG
+          </button>
+        </div>
+        
+        <svg
+          ref={svgRef}
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 800 600"
+          className="w-full max-w-4xl"
+          style={{ background: '#ffffff' }}
+        >
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" />
+            </marker>
+            <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#3B82F6" />
+            </marker>
+          </defs>
+
+          {/* ==================================================== */}
+          {/* CONNECTIONS (Lines & Arrows)                           */}
+          {/* ==================================================== */}
+          <g stroke="#475569" strokeWidth="2" fill="none">
+            {/* User to UI */}
+            <line x1="400" y1="55" x2="400" y2="90" markerEnd="url(#arrow)" />
+            
+            {/* UI to Orchestrator (Bidirectional) */}
+            <line x1="400" y1="150" x2="400" y2="230" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+
+            {/* Orchestrator to LLM (Bidirectional) */}
+            <line x1="400" y1="290" x2="400" y2="390" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+
+            {/* Orchestrator to AnyLogistix API (Bidirectional) */}
+            <line x1="510" y1="260" x2="620" y2="260" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+
+            {/* AnyLogistix to Data Processing */}
+            <line x1="680" y1="290" x2="680" y2="390" markerEnd="url(#arrow)" />
+
+            {/* Data Processing back to Orchestrator */}
+            <path d="M 620 420 L 510 420 L 510 290" markerEnd="url(#arrow)" />
+
+            {/* Orchestrator to RAG DB (Bidirectional) */}
+            <line x1="290" y1="260" x2="180" y2="260" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+          </g>
+
+          {/* ==================================================== */}
+          {/* NODES / BOXES                                          */}
+          {/* ==================================================== */}
+          
+          {/* User Icon */}
+          <g fill="#1E293B" transform="translate(400, 20)">
+            <circle cx="0" cy="-10" r="12" />
+            <path d="M -18 10 C -18 0 18 0 18 10 Z" />
+            <text x="0" y="25" textAnchor="middle" fontFamily="sans-serif" fontSize="14" fontWeight="600" fill="#475569">User</text>
+          </g>
+
+          {/* UI Box */}
+          <rect x="290" y="90" width="220" height="60" rx="6" fill="#F8FAFC" stroke="#1D4ED8" strokeWidth="2.5" />
+          <text x="400" y="125" textAnchor="middle" fontFamily="sans-serif" fontSize="16" fontWeight="600" fill="#0F172A">Chainlit (Web UI)</text>
+
+          {/* Orchestrator Box (Central Brain) */}
+          <rect x="290" y="230" width="220" height="60" rx="6" fill="#EFF6FF" stroke="#2563EB" strokeWidth="3" />
+          <text x="400" y="255" textAnchor="middle" fontFamily="sans-serif" fontSize="16" fontWeight="700" fill="#1E3A8A">Orchestrator Agent</text>
+          <text x="400" y="275" textAnchor="middle" fontFamily="sans-serif" fontSize="12" fontWeight="500" fill="#3B82F6">(LangChain + LangGraph)</text>
+
+          {/* LLM Engine Box */}
+          <rect x="290" y="390" width="220" height="60" rx="6" fill="#F8FAFC" stroke="#1D4ED8" strokeWidth="2.5" />
+          <text x="400" y="425" textAnchor="middle" fontFamily="sans-serif" fontSize="16" fontWeight="600" fill="#0F172A">LLM Engine (OpenAI/Local)</text>
+
+          {/* AnyLogistix Server Box */}
+          <rect x="620" y="230" width="160" height="60" rx="6" fill="#F8FAFC" stroke="#059669" strokeWidth="2.5" />
+          <text x="700" y="255" textAnchor="middle" fontFamily="sans-serif" fontSize="16" fontWeight="600" fill="#0F172A">AnyLogistix VM</text>
+          <text x="700" y="275" textAnchor="middle" fontFamily="sans-serif" fontSize="12" fontWeight="500" fill="#059669">REST API Client</text>
+
+          {/* Data Processing Box */}
+          <rect x="620" y="390" width="160" height="60" rx="6" fill="#F8FAFC" stroke="#D97706" strokeWidth="2.5" />
+          <text x="700" y="415" textAnchor="middle" fontFamily="sans-serif" fontSize="14" fontWeight="600" fill="#0F172A">Modification & Analysis</text>
+          <text x="700" y="435" textAnchor="middle" fontFamily="sans-serif" fontSize="12" fontWeight="500" fill="#D97706">(xlwings + pandas)</text>
+
+          {/* RAG / Vector DB Box */}
+          <rect x="20" y="230" width="160" height="60" rx="6" fill="#F8FAFC" stroke="#7C3AED" strokeWidth="2.5" />
+          <text x="100" y="255" textAnchor="middle" fontFamily="sans-serif" fontSize="16" fontWeight="600" fill="#0F172A">RAG System</text>
+          <text x="100" y="275" textAnchor="middle" fontFamily="sans-serif" fontSize="12" fontWeight="500" fill="#7C3AED">Vector Database</text>
+        </svg>
+      </div>
+    </div>
+  );
+}
