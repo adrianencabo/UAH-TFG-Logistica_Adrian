@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ==============================================================================
+# ANYLOGISTIX CHATBOT CUSTOM RULES
+# ==============================================================================
+
+# Ignore temporary Excel lock files (created when a user or xlwings opens a file)
+~$*
+
+# Ignore generated and modified simulation Excel scenarios to prevent repository bloat
+src/Fase_3_4_Chatbot/Archivos/*.xlsx
+src/Fase_3_4_Chatbot/Resultados_IA/*.xlsx
