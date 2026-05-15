@@ -1,6 +1,6 @@
 # Troubleshooting and Known Issues
 
-This document outlines the primary technical challenges encountered during the development of the AnyLogistix API integration (Phases 1 and 2), along with the implemented solutions. This record serves as a technical reference for environment debugging and API limitation handling.
+This document outlines the primary technical challenges encountered during the development of the AnyLogistix API integration (Phases 1 and 2) and the Chatbot architecture (Phases 3 and 4), along with the implemented solutions. This record serves as a technical reference for environment debugging and API limitation handling.
 
 ## 1. Environment and Dependency Conflicts (Dependency Hell)
 **Issue:** The AnyLogistix `openapi-client` strictly requires the `pydantic` library to be version `< 2.0` (specifically `>= 1.10.5`). However, modern versions of Anaconda Navigator require `pydantic >= 2.0` to launch the graphical interface. Attempting to satisfy both within the same `base` environment results in a conflict: upgrading `pydantic` breaks the API, while downgrading it breaks the Anaconda Navigator GUI.
@@ -24,3 +24,19 @@ This document outlines the primary technical challenges encountered during the d
 **Issue:** During Phase 2, attempts to programmatically modify scenario tables and re-upload them failed with severe type validation errors (e.g., `type_error.none.not_allowed`).
 **Root Cause:** The AnyLogistix API `import_excel_existing` method enforces a zero-tolerance format validation. The imported Excel must flawlessly match the platform's internal schema. Furthermore, the Native API does not support exporting full scenarios to Excel, preventing the Python script from generating a valid baseline template autonomously.
 **Solution:** A hybrid approach (Path A) was adopted. The baseline scenario Excel must be manually exported via the AnyLogistix graphical interface once. The Python script then securely parses this pristine template, applies the Flat AI modifications, and uploads it via the API to trigger the cloned simulation.
+
+## 5. Local Excel Dependency (xlwings)
+**Issue:** The chosen library for modifying the baseline scenario templates (`xlwings`) requires a local installation of Microsoft Excel to function, unlike other lightweight parsing libraries like `pandas`.
+**Solution:** It is documented as a system requirement that the machine hosting the chatbot server must have Microsoft Excel installed. This trade-off was accepted because `xlwings` guarantees that the strict internal XML formatting of the AnyLogistix templates remains intact during modification.
+
+## 6. Chainlit Asynchronous Handling
+**Issue:** The AnyLogistix simulations are synchronous and computationally heavy. Waiting for a simulation to finish caused the Chainlit web interface to freeze, degrading the user experience.
+**Solution:** Asynchronous wrappers and Chainlit's task processing callbacks (`cl.Step`) were implemented. This allows the UI to remain responsive and provide the user with real-time visual logs indicating that the simulation is currently running on the server.
+
+## 7. Credential Security (.env)
+**Issue:** Hardcoding the AnyLogistix and LLM API keys in the source files poses a severe security risk when uploading the code to version control repositories like GitHub.
+**Solution:** All sensitive credentials were extracted and isolated into a local `.env` file using the `python-dotenv` library. The `.env` file was explicitly added to the `.gitignore` rules to prevent accidental exposure.
+
+## 8. LLM API Billing and Quota Limitations
+**Issue:** During the development of the LangChain Agent (Phase 3), initial attempts to integrate OpenAI models (GPT-3.5/GPT-4) or the Google Gemini Pro model failed due to strict billing configuration requirements (credit card mandates) and restricted free-tier quotas.
+**Solution:** The system architecture was pivoted to utilize `gemini-flash` (Gemini 1.5 Flash). This model offers a highly generous free tier suitable for academic development while maintaining the necessary speed, context window, and reasoning capabilities required for LangChain tool orchestration.
