@@ -39,3 +39,26 @@ pip install -e ./openapi-python-client-3.3.1
 
 # 3. Install the AI and UI frameworks
 pip install -r requirements.txt
+```
+
+### 3. API Connection Parameters & Security (.env)
+**CRITICAL:** Never hardcode your API keys in the source files. 
+Create a file named `.env` in the root directory (this file is ignored by Git) based on the provided `.env.example`:
+
+```text
+# Example .env content
+ALX_API_KEY=YOUR_ANYLOGISTIX_API_KEY
+OPENAI_API_KEY=YOUR_OPENAI_API_KEY
+```
+
+Once the environment is ready, the connection scripts will parse the server and authentication parameters dynamically.
+* **Server Host:** `alxserver.aut.uah.es`
+* **Security Note:** The connection scripts include a bypass for SSL verification (`configuration.verify_ssl = False`) and disable `InsecureRequestWarning`. This is a required configuration to successfully communicate with the university's server via self-signed certificates.
+
+### 4. Running the Chatbot Server
+To start the conversational interface, navigate to the project folder containing `app.py` in your terminal and execute:
+
+```bash
+chainlit run app.py -w
+```
+This will start the local server and automatically open the chatbot UI in your default web browser (typically at `localhost:8000`).
