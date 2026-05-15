@@ -5,7 +5,8 @@ This repository contains the source code for an Intelligent Conversational Agent
 
 ## Project Architecture
 The system follows a multi-agent orchestration architecture:
-`User <--> Chainlit (Web UI) <--> LangChain/LangGraph (Agent Core) <--> AnyLogistix REST API (Virtual Machine)`
+<img width="882" height="515" alt="image" src="https://github.com/user-attachments/assets/c99213b7-0a41-4801-bdd2-1f8f33695d5f" />
+
 
 **Core Technology Stack:**
 * **Frontend:** Chainlit (React-based conversational UI)
