@@ -1,0 +1,14 @@
+# Conversational Interface
+chainlit
+
+# AI Orchestration
+langchain
+langchain-google-genai
+langgraph
+
+# Data and Scenario Manipulation
+xlwings
+pandas
+
+# Credential Security
+python-dotenv
