@@ -225,5 +225,9 @@ __marimo__/
 ~$*
 
 # Ignore generated and modified simulation Excel scenarios to prevent repository bloat
+
+# Ignore Vector Database and Knowledge Base documents
+src/Fase_3_4_Chatbot/chroma_db/
+src/Fase_3_4_Chatbot/Knowledge_Base/*.pdf
 src/Fase_3_4_Chatbot/Archivos/*.xlsx
 src/Fase_3_4_Chatbot/Resultados_IA/*.xlsx
