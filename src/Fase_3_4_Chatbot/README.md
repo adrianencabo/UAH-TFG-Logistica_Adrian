@@ -25,6 +25,8 @@ The system leverages the Chainlit framework to provide a modern, web-based chat 
 * **Session Management:** Utilization of `cl.user_session` to maintain conversational memory and context across multiple interactions.
 * **Real-time Execution Logging:** Visual feedback is provided to the user during intermediate tool executions, an essential feature given the latency of Virtual Machine simulation processing.
 * **Asynchronous Processing:** The application handles asynchronous messaging to ensure UI responsiveness while communicating with the external REST API.
+* **Drag-and-Drop Integration:** Users are no longer required to input absolute local file paths. The UI supports direct Excel file uploads, which are temporarily stored, processed, and injected into the Virtual Machine autonomously.
+* **Retrieval-Augmented Generation (RAG):** Integration of a local Vector Database (ChromaDB) powered by HuggingFace embeddings (`all-MiniLM-L6-v2`). This grants the agent a local knowledge base, allowing it to read logistical manuals (PDFs) and answer complex theoretical queries (e.g., "Bullwhip Effect", "Green Field Analysis") accurately.
 
 ## Directory Structure
 * `alx_tools.py`: Core module containing API request functions and Excel manipulation logic.
@@ -33,3 +35,5 @@ The system leverages the Chainlit framework to provide a modern, web-based chat 
 * `chainlit.md`: Custom welcome screen configuration for the chatbot UI.
 * `/Archivos`: Local storage directory for base and modified Excel scenario templates.
 * `/Resultados_IA`: Repository for the `.xlsx` simulation dashboard results extracted by the agent.
+
+
