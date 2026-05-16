@@ -6,6 +6,11 @@ langchain
 langchain-google-genai
 langgraph
 
+# RAG and Vector Database
+chromadb
+sentence-transformers
+langchain-community
+
 # Data and Scenario Manipulation
 xlwings
 pandas
