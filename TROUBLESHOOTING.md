@@ -37,6 +37,14 @@ This document outlines the primary technical challenges encountered during the d
 **Issue:** Hardcoding the AnyLogistix and LLM API keys in the source files poses a severe security risk when uploading the code to version control repositories like GitHub.
 **Solution:** All sensitive credentials were extracted and isolated into a local `.env` file using the `python-dotenv` library. The `.env` file was explicitly added to the `.gitignore` rules to prevent accidental exposure.
 
-## 8. LLM API Billing and Quota Limitations
-**Issue:** During the development of the LangChain Agent (Phase 3), initial attempts to integrate OpenAI models (GPT-3.5/GPT-4) or the Google Gemini Pro model failed due to strict billing configuration requirements (credit card mandates) and restricted free-tier quotas.
-**Solution:** The system architecture was pivoted to utilize `gemini-flash` (Gemini 1.5 Flash). This model offers a highly generous free tier suitable for academic development while maintaining the necessary speed, context window, and reasoning capabilities required for LangChain tool orchestration.
+## 8. LLM Benchmarking and Quota Limitations
+**Issue:** Selecting the optimal Large Language Model (LLM) for the LangChain agent required extensive benchmarking due to strict tool-calling formatting requirements, context window limitations, and billing constraints.
+* *OpenAI / Gemini Pro:* Discarded due to mandatory billing configurations and restricted free-tier quotas.
+* *Groq (Llama 3 8B / 70B):* Discarded. The 8B model failed to generate valid JSON structures required for LangChain tool calling (`tool_use_failed` errors) and hit severe Tokens-Per-Minute (6000 TPM) limits. The 70B model formatted correctly but instantly depleted the daily token allowance (100k/day) due to the massive conversation history.
+**Solution:** The system architecture was definitively pivoted to **Google Gemini 2.5 Flash**. This model offers a massive 1,000,000 token context window, perfectly handling the extensive chat history and AnyLogistix simulation logs without truncation. The only limitation (20 Requests Per Minute) is programmatically managed by catching the HTTP 429 error, pausing the execution for 60 seconds, and resuming the ReAct reasoning loop.
+
+## 9. Dynamic File Upload and Formatting Strictness
+**Issue:** During the implementation of the UI drag-and-drop file upload feature, the AnyLogistix API rejected the modified Excel templates.
+**Root Causes & Solutions:**
+* *Extension Loss:* Chainlit stored temporary files without the `.xlsx` extension. Since the AnyLogistix API has zero-tolerance for format deviations, the backend logic (`alx_tools.py`) was updated to force the `.xlsx` extension on all uploaded files.
+* *Dynamic Headers:* The structural schema of the AnyLogistix tables varies slightly depending on the export. The Python parsing logic was updated to dynamically search for headers across rows 1 and 2, ensuring `xlwings` injects the AI-modified parameters into the exact correct cells regardless of minor structural shifts.
