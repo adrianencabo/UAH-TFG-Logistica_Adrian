@@ -48,3 +48,12 @@ This document outlines the primary technical challenges encountered during the d
 **Root Causes & Solutions:**
 * *Extension Loss:* Chainlit stored temporary files without the `.xlsx` extension. Since the AnyLogistix API has zero-tolerance for format deviations, the backend logic (`alx_tools.py`) was updated to force the `.xlsx` extension on all uploaded files.
 * *Dynamic Headers:* The structural schema of the AnyLogistix tables varies slightly depending on the export. The Python parsing logic was updated to dynamically search for headers across rows 1 and 2, ensuring `xlwings` injects the AI-modified parameters into the exact correct cells regardless of minor structural shifts.
+
+## 10. Data Type Coercion in KPI Analysis (Pandas)
+**Issue:** The LangChain agent was unable to mathematically analyze the extracted KPI DataFrames.
+**Root Cause:** AnyLogistix Excel dashboard exports include three rows of textual metadata (e.g., "Chart name", "Statistics list") at the top of numerical columns. The `pandas` library automatically inferred these entire columns as `object` (string) types, effectively masking the numerical data from the agent.
+**Solution:** The `analyze_kpis` tool was refactored to enforce numerical coercion utilizing `pd.to_numeric(df[col], errors='coerce')`. This technique converts the metadata strings into `NaN` (which are ignored during mathematical operations) while exposing the underlying float values, allowing the agent to calculate accurate means and sums.
+
+## 11. Concurrency and File Overlap Collisions
+**Issue:** Successive agent iterations overwrote previously modified Excel templates and scenario configurations on the server, leading to corrupted simulation runs and lost history.
+**Solution:** A dynamic naming convention was implemented utilizing Unix timestamps (`time.time()`). Both the locally modified `.xlsx` files and the newly injected AnyLogistix scenario names are now mathematically unique per execution second (e.g., `Modified_Scenario_171543...xlsx`). This completely prevents data collision and ensures full traceability of every action taken by the agent.
