@@ -6,18 +6,26 @@ import urllib3
 import xlwings as xw
 import pandas as pd
 from typing import List, Dict, Any, Union
+
 from langchain.tools import tool
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
+
 # Assuming openapi_client is available in the environment path or installed.
 import openapi_client
 from openapi_client.rest import ApiException
+
 # Constants
 SERVER_IP = "alxserver.aut.uah.es"
 SERVER_URL = f"https://{SERVER_IP}:443/api/v1"
 API_KEY = "c184f1ab-9f13-484c-a1c1-3d543502da6e"
+
+SCENARIOS_DIR = r"C:\Users\Luis\Downloads\TFG\FASE 3 Y 4\Chatbot\Archivos"
+RESULTS_DIR = r"C:\Users\Luis\Downloads\TFG\FASE 3 Y 4\Chatbot\Resultados_IA"
+
 # Disable warnings for self-signed certificates
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 def get_api_instance():
     """Helper function to configure and return the AnyLogistix API instance."""
     configuration = openapi_client.Configuration(host=SERVER_URL)
@@ -25,6 +33,7 @@ def get_api_instance():
     configuration.verify_ssl = False
     api_client = openapi_client.ApiClient(configuration)
     return openapi_client.OpenApiApi(api_client)
+
 @tool
 def open_and_get_project(project_name: str) -> Union[int, str]:
     """
@@ -46,6 +55,7 @@ def open_and_get_project(project_name: str) -> Union[int, str]:
         return f"API Exception: {e}"
     except Exception as e:
         return f"Error: {e}"
+
 @tool
 def get_scenarios_list(project_id: int) -> Union[List[Dict[str, Any]], str]:
     """
@@ -64,6 +74,7 @@ def get_scenarios_list(project_id: int) -> Union[List[Dict[str, Any]], str]:
         return [{"id": s.id, "name": s.name, "type": s.type} for s in scenarios]
     except Exception as e:
         return f"Error: {e}"
+
 @tool
 def run_simulation(project_id: int, scenario_id: int) -> Union[int, str]:
     """
@@ -86,57 +97,83 @@ def run_simulation(project_id: int, scenario_id: int) -> Union[int, str]:
             return "Error: No SIMULATION experiment found for this scenario."
             
         sim_result = api_instance.run_experiment_synchronously(sim_rc.id)
+        
+        # Check if the simulation failed validation before starting
+        validation_status = getattr(sim_result, 'validation_status', None)
+        if validation_status == 'FAILED' or validation_status == 'ERROR':
+            errors = getattr(sim_result, 'validation_errors', [])
+            if errors:
+                err_msg = "; ".join([getattr(e, 'message', str(e)) for e in errors])
+                return f"Error: Simulation failed validation. Reason: {err_msg}"
+            return "Error: Simulation failed validation with unknown errors."
+            
         result_id = getattr(sim_result, 'experiment_result_id', None)
         return result_id if result_id is not None else "Error: No experiment_result_id returned."
     except Exception as e:
         return f"Error: {e}"
+
 @tool
-def export_simulation_results(experiment_result_id: int, output_dir: str) -> str:
+def export_simulation_results(experiment_result_id: int, scenario_name: str, is_modified: bool = False) -> str:
     """
     Exports all available dashboard pages for a given simulation result ID,
     consolidates them into a single Excel file with multiple tabs, and cleans up the temporary files.
     
     Args:
         experiment_result_id (int): The ID of the simulation result.
-        output_dir (str): The directory path where the consolidated Excel file will be saved.
+        scenario_name (str): The name of the scenario to include in the file name.
+        is_modified (bool): Whether the scenario being exported is the AI modified version or the original.
         
     Returns:
         str: The absolute path to the consolidated Excel file, or an error message.
     """
     api_instance = get_api_instance()
     
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    if not os.path.exists(RESULTS_DIR):
+        os.makedirs(RESULTS_DIR)
         
-    consolidated_path = os.path.join(output_dir, f"Consolidated_Results_{experiment_result_id}.xlsx")
+    # Clean the scenario name for file saving
+    safe_scenario_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', scenario_name)
+    version = "Modified" if is_modified else "Original"
+    consolidated_path = os.path.join(RESULTS_DIR, f"KPIs_{safe_scenario_name}_{version}_{experiment_result_id}.xlsx")
     temp_files = []
     
     try:
         dashboard_pages = api_instance.get_experiment_dashboard_pages(experiment_result_id)
         
+        if not dashboard_pages:
+            return "Error: No dashboard pages found for this simulation result. Please configure statistics in AnyLogistix."
+            
+        # Read all valid dataframes first to avoid opening an empty ExcelWriter
+        valid_dfs = {}
+        for page in dashboard_pages:
+            safe_page_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', page.name)
+            temp_filename = f"temp_{safe_page_name}.xlsx"
+            temp_path = os.path.join(RESULTS_DIR, temp_filename)
+            
+            excel_export = api_instance.export_dashboard_page(experiment_result_id, page.id)
+            
+            if isinstance(excel_export, str) and os.path.exists(excel_export):
+                shutil.move(excel_export, temp_path)
+                temp_files.append(temp_path)
+            elif isinstance(excel_export, bytes):
+                with open(temp_path, "wb") as file:
+                    file.write(excel_export)
+                temp_files.append(temp_path)
+            
+            try:
+                df = pd.read_excel(temp_path)
+                sheet_name = safe_page_name[:31]  # Excel limits sheet names to 31 chars
+                valid_dfs[sheet_name] = df
+            except Exception as e:
+                pass  # Skip if pandas fails to read the temp file
+                
+        if not valid_dfs:
+            return "Error: Exported dashboards were empty or unreadable. Please ensure the scenario has active dashboards with data."
+            
         with pd.ExcelWriter(consolidated_path, engine='openpyxl') as writer:
-            for page in dashboard_pages:
-                safe_page_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', page.name)
-                temp_filename = f"temp_{safe_page_name}.xlsx"
-                temp_path = os.path.join(output_dir, temp_filename)
-                
-                excel_export = api_instance.export_dashboard_page(experiment_result_id, page.id)
-                
-                if isinstance(excel_export, str) and os.path.exists(excel_export):
-                    shutil.move(excel_export, temp_path)
-                    temp_files.append(temp_path)
-                elif isinstance(excel_export, bytes):
-                    with open(temp_path, "wb") as file:
-                        file.write(excel_export)
-                    temp_files.append(temp_path)
-                
-                try:
-                    df = pd.read_excel(temp_path)
-                    sheet_name = safe_page_name[:31]  # Excel limits sheet names to 31 chars
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-                except Exception as e:
-                    pass  # Skip if pandas fails to read the temp file
-                    
+            for sheet_name, df in valid_dfs.items():
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+            
         # Cleanup temp files
         for temp_file in temp_files:
             try:
@@ -146,7 +183,11 @@ def export_simulation_results(experiment_result_id: int, output_dir: str) -> str
                 
         return consolidated_path
     except Exception as e:
+        error_str = str(e)
+        if "because \\\"run\\\" is null" in error_str or "run is null" in error_str:
+            return "Error: The simulation failed on the AnyLogistix server and produced no data. Please verify the scenario is valid and runnable."
         return f"Error: {e}"
+
 @tool
 def analyze_kpis(consolidated_excel_path: str) -> str:
     """
@@ -171,7 +212,41 @@ def analyze_kpis(consolidated_excel_path: str) -> str:
             try:
                 df = pd.read_excel(xls, sheet_name=sheet)
                 
-                # Force convert object columns to numeric (coercing metadata strings to NaN)
+                # Special parsing for ALX dashboards (which have "Statistics name", "Time", "Value")
+                if 'Statistics name' in df.values:
+                    # Find the header row
+                    header_row_idx = df[df.eq('Statistics name').any(axis=1)].index[0]
+                    clean_df = df.iloc[header_row_idx+1:].copy()
+                    clean_df.columns = df.iloc[header_row_idx]
+                    
+                    if 'Value' in clean_df.columns and 'Statistics name' in clean_df.columns:
+                        clean_df['Value'] = pd.to_numeric(clean_df['Value'], errors='coerce')
+                        sheet_summary = [f"--- Dashboard: {sheet} ---"]
+                        
+                        grouped = clean_df.groupby('Statistics name')['Value'].agg(['mean', 'sum']).reset_index()
+                        
+                        revenue_sum = 0
+                        cost_sum = 0
+                        
+                        for _, row in grouped.iterrows():
+                            stat_name = str(row['Statistics name']).strip()
+                            avg_val = row['mean']
+                            sum_val = row['sum']
+                            sheet_summary.append(f"- {stat_name}: Average = {avg_val:.2f}, Total Sum = {sum_val:.2f}")
+                            
+                            if stat_name.lower() == 'revenue':
+                                revenue_sum = sum_val
+                            elif stat_name.lower() == 'total cost':
+                                cost_sum = sum_val
+                                
+                        if revenue_sum > 0 and cost_sum > 0:
+                            net_profit = revenue_sum - cost_sum
+                            sheet_summary.append(f"- **NET PROFIT (Calculated)**: {net_profit:.2f}")
+                            
+                        summary.extend(sheet_summary)
+                        continue
+                        
+                # Fallback for generic numeric columns
                 for col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce')
                     
@@ -181,11 +256,9 @@ def analyze_kpis(consolidated_excel_path: str) -> str:
                     sheet_summary = [f"--- Dashboard: {sheet} ---"]
                     
                     for col in numeric_cols:
-                        # Skip meaningless numeric columns like IDs
                         if str(col).lower() in ['id', 'iteration', 'replication', 'period']:
                             continue
                             
-                        # If the column has actual data (not just NaNs from coerced strings)
                         if not df[col].isna().all():
                             avg_val = df[col].mean()
                             sum_val = df[col].sum()
@@ -200,8 +273,9 @@ def analyze_kpis(consolidated_excel_path: str) -> str:
         return "\n".join(summary) if summary else "No numeric KPIs found."
     except Exception as e:
         return f"Error analyzing KPIs: {e}"
+
 @tool
-def modify_scenario_excel(original_excel_path: str, decision_index: int, output_dir: str) -> str:
+def modify_scenario_excel(original_excel_path: str, decision_index: int, new_scenario_name: str) -> str:
     """
     Applies an AI decision to modify an existing scenario Excel file using Microsoft Excel (xlwings).
     
@@ -211,27 +285,24 @@ def modify_scenario_excel(original_excel_path: str, decision_index: int, output_
             0 = Increase Demand by 20%
             1 = Decrease Transport Costs by 15%
             2 = Increase Safety Stock by 10%
-        output_dir (str): The directory where the modified Excel file will be saved.
+        new_scenario_name (str): The name of the new scenario. Used for the output file name.
         
     Returns:
         str: The absolute path to the modified Excel file, or an error message.
     """
     # 1. FORCE ABSOLUTE PATHS
     original_excel_path = os.path.abspath(original_excel_path)
-    output_dir = os.path.abspath(output_dir)
     
     if not os.path.exists(original_excel_path):
         return "Error: Original Excel file does not exist."
         
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    if not os.path.exists(SCENARIOS_DIR):
+        os.makedirs(SCENARIOS_DIR)
         
-    filename = os.path.basename(original_excel_path)
-    if not filename.lower().endswith('.xlsx'):
-        filename += '.xlsx'
+    safe_scenario_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', new_scenario_name)
         
     # 2. UNIQUE FILENAME to prevent Excel from blocking overwrites
-    modified_excel_path = os.path.join(output_dir, f"Modified_Decision_{decision_index}_{int(time.time())}_{filename}")
+    modified_excel_path = os.path.join(SCENARIOS_DIR, f"{safe_scenario_name}_Decision_{decision_index}_{int(time.time())}.xlsx")
     
     try:
         shutil.copy2(original_excel_path, modified_excel_path)
@@ -309,9 +380,11 @@ def modify_scenario_excel(original_excel_path: str, decision_index: int, output_
                     if isinstance(current_val, (int, float)):
                         ws.range((r, col6_idx)).value = current_val * 1.10
                         changes_made += 1
+
         # 4. SAFETY CHECK IF LOGIC FAILS
         if changes_made == 0:
             return "Error: Excel file opened, but 0 modifications were made. Check if the scenario format is correct."
+
         wb.save()
         return modified_excel_path
     except Exception as e:
@@ -324,6 +397,7 @@ def modify_scenario_excel(original_excel_path: str, decision_index: int, output_
         app.quit()
         # 5. GIVE WINDOWS TIME TO RELEASE THE FILE BEFORE UPLOADING
         time.sleep(1.5)
+
 @tool
 def upload_modified_scenario(project_id: int, file_path: str, new_scenario_name: str) -> Union[int, str]:
     """
@@ -366,6 +440,7 @@ def upload_modified_scenario(project_id: int, file_path: str, new_scenario_name:
             
     except Exception as e:
         return f"Error during scenario import: {e}"
+
 @tool
 def search_knowledge_base(query: str) -> str:
     """
@@ -380,7 +455,7 @@ def search_knowledge_base(query: str) -> str:
     Returns:
         str: Relevant text snippets from the official documentation to answer the query.
     """
-    chroma_db_dir = r"C:\Users\Luis\Downloads\TFG\Chatbot\chroma_db"
+    chroma_db_dir = r"C:\Users\Luis\Downloads\TFG\FASE 3 Y 4\Chatbot\chroma_db"
     if not os.path.exists(chroma_db_dir):
         return "Error: The knowledge database has not been built yet."
         
@@ -397,6 +472,7 @@ def search_knowledge_base(query: str) -> str:
         return result
     except Exception as e:
         return f"Error searching the database: {e}"
+
 # Export the tools for LangGraph/LangChain
 alx_tools = [
     open_and_get_project,
