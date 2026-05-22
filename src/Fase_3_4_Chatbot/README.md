@@ -17,6 +17,11 @@ An LLM was configured as the central decision-making engine.
 * **Tool Binding:** Functions from `alx_tools.py` were exposed to the LLM using the `@tool` decorator, accompanied by precise docstrings.
 * **Autonomous Reasoning:** The agent utilizes these definitions to interpret natural language requests, determine the required sequence of logistical tools, and execute them dynamically.
 
+### 3. Business Logic and Pydantic Schemas
+To elevate the agent from a pure execution engine to a logistics consultant:
+* **Pydantic Tooling:** Tool arguments were strictly defined using `pydantic.Field` descriptions, ensuring the LLM understands the precise formatting required by the AnyLogistix API.
+* **Hardcoded Business Rules:** The agent was systematically prompted with the logistical impacts of its available tools (e.g., increasing demand maximizes revenue but raises costs; lowering transport costs maximizes net profit). This allows the agent to autonomously match user objectives ("I want to improve service levels") with the correct mathematical decision.
+
 ## Phase 4: Conversational Interface (`app.py`)
 Phase 4 focused on deploying a user-facing frontend to democratize access to the simulation engine without requiring direct interaction with the AnyLogistix GUI.
 
@@ -26,6 +31,7 @@ The system leverages the Chainlit framework to provide a modern, web-based chat 
 * **Real-time Execution Logging:** Visual feedback is provided to the user during intermediate tool executions, an essential feature given the latency of Virtual Machine simulation processing.
 * **Asynchronous Processing:** The application handles asynchronous messaging to ensure UI responsiveness while communicating with the external REST API.
 * **Drag-and-Drop Integration:** Users are no longer required to input absolute local file paths. The UI supports direct Excel file uploads, which are temporarily stored, processed, and injected into the Virtual Machine autonomously.
+* **Robust MIME Type Handling:** The file upload filter was expanded to accept `.zip` MIME types, as modern `.xlsx` files are compressed XML archives. This prevents browser-specific upload rejections and ensures the AI successfully receives the files.
 * **Retrieval-Augmented Generation (RAG):** Integration of a local Vector Database (ChromaDB) powered by HuggingFace embeddings (`all-MiniLM-L6-v2`). This grants the agent a local knowledge base, allowing it to read logistical manuals (PDFs) and answer complex theoretical queries (e.g., "Bullwhip Effect", "Green Field Analysis") accurately.
 
 ## Directory Structure
