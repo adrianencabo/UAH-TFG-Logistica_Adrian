@@ -57,3 +57,15 @@ This document outlines the primary technical challenges encountered during the d
 ## 11. Concurrency and File Overlap Collisions
 **Issue:** Successive agent iterations overwrote previously modified Excel templates and scenario configurations on the server, leading to corrupted simulation runs and lost history.
 **Solution:** A dynamic naming convention was implemented utilizing Unix timestamps (`time.time()`). Both the locally modified `.xlsx` files and the newly injected AnyLogistix scenario names are now mathematically unique per execution second (e.g., `Modified_Scenario_171543...xlsx`). This completely prevents data collision and ensures full traceability of every action taken by the agent.
+
+## 12. Openpyxl Crash on Empty Dashboards
+**Issue:** The `export_simulation_results` function occasionally caused a fatal `openpyxl` crash ("At least one sheet must be visible") when AnyLogistix returned empty dashboards (due to unconfigured statistics or aborted runs).
+**Solution:** Refactored the data extraction logic to first validate and load all DataFrames into RAM (`valid_dfs`). The `pd.ExcelWriter` block is now conditionally executed only if at least one valid sheet is confirmed, preventing corrupt file generation.
+
+## 13. AnyLogistix Server NullPointerException (HTTP 500)
+**Issue:** The server intermittently returned HTTP 500 errors (`run is null`) when attempting to retrieve simulation results, despite the experiment being marked as completed.
+**Solution:** Implemented a robust retry mechanism (up to 3 attempts with delays) for fetching run configurations and handling HTTP 500 exceptions, allowing the server sufficient time to finalize its internal database commits before data extraction.
+
+## 14. Scenario Duplication and Misidentification
+**Issue:** The API's `import_excel_existing` method does not explicitly return the ID of the newly created scenario in its JSON body, leading the agent to occasionally overwrite the wrong scenario or create duplicates.
+**Solution:** Modified the `upload_modified_scenario` function to parse the HTTP response headers. By extracting the exact ID from the `Location` header URL, the system accurately tracks the newly injected scenario, ensuring strict traceability for subsequent simulations.
