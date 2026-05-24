@@ -10,7 +10,7 @@ The objective of Phase 3 was to refactor the procedural scripts developed in ear
 The logic for connection, simulation, data extraction, and scenario manipulation was encapsulated into atomic Python functions.
 * **Dynamic Connection Management:** Programmatic handling of authentication and SSL verification bypass.
 * **Workflow Automation:** Methods to clone scenarios, trigger synchronous experiments, and manage the multi-step dashboard export process.
-* **Excel Data Manipulation:** Integration of the `xlwings` library to programmatically inject AI-determined values into AnyLogistix Excel templates before re-importing them into the server.
+* **Excel Data Manipulation:** Integration of the `xlwings` library to programmatically inject AI-determined values into AnyLogistix Excel templates before re-importing them. The logic employs dynamic row scanning and key-value mapping to ensure absolute resilience against AnyLogistix's changing column layouts.
 
 ### 2. LangChain Orchestration (`agent.py`)
 An LLM was configured as the central decision-making engine.
