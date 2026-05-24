@@ -47,7 +47,8 @@ This document outlines the primary technical challenges encountered during the d
 **Issue:** During the implementation of the UI drag-and-drop file upload feature, the AnyLogistix API rejected the modified Excel templates.
 **Root Causes & Solutions:**
 * *Extension Loss:* Chainlit stored temporary files without the `.xlsx` extension. Since the AnyLogistix API has zero-tolerance for format deviations, the backend logic (`alx_tools.py`) was updated to force the `.xlsx` extension on all uploaded files.
-* *Dynamic Headers:* The structural schema of the AnyLogistix tables varies slightly depending on the export. The Python parsing logic was updated to dynamically search for headers across rows 1 and 2, ensuring `xlwings` injects the AI-modified parameters into the exact correct cells regardless of minor structural shifts.
+* *Dynamic Column Ordering:* It was discovered that AnyLogistix dynamically changes the column order of its exports based on the applied supply chain policies. Initial implementations using hardcoded column indexes corrupted the Excel templates upon modification. To achieve 100% format resilience, the `xlwings` parsing logic in `alx_tools.py` was rewritten to perform a dynamic row scan. The algorithm now textually searches for the specific parameter's key and safely modifies its adjacent cell value, entirely decoupling the agent from strict column positioning.
+  
 
 ## 10. Data Type Coercion in KPI Analysis (Pandas)
 **Issue:** The LangChain agent was unable to mathematically analyze the extracted KPI DataFrames.
