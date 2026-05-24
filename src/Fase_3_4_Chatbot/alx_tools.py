@@ -319,67 +319,63 @@ def modify_scenario_excel(original_excel_path: str, decision_index: int, new_sce
         changes_made = 0 # Inicializamos
         
         if decision_index == 0:
-            # (Tu código original de Increase Demand...)
             ws = wb.sheets['Demand']
             last_col = ws.used_range.last_cell.column
             last_row = ws.used_range.last_cell.row
             
-            headers_row1 = ws.range((1, 1), (1, last_col)).value
-            headers_row2 = ws.range((2, 1), (2, last_col)).value
-            headers1 = headers_row1 if isinstance(headers_row1, list) else [headers_row1]
-            headers2 = headers_row2 if isinstance(headers_row2, list) else [headers_row2]
-            
-            col7_idx = None
-            col10_idx = None
-            
-            if 'Col 7' in headers1: col7_idx = headers1.index('Col 7') + 1
-            if 'Col 10' in headers1: col10_idx = headers1.index('Col 10') + 1
-            if not col7_idx and 'Parameters' in headers2: col7_idx = headers2.index('Parameters') + 1
-            if not col10_idx and 'Parameters' in headers1: col10_idx = headers1.index('Parameters') + 1 
-            if not col7_idx: col7_idx = 7
-            if not col10_idx: col10_idx = 10
-            
             for r in range(2, last_row + 1):
-                if ws.range((r, col7_idx)).value == 'Quantity':
-                    current_val = ws.range((r, col10_idx)).value
-                    if isinstance(current_val, (int, float)):
-                        ws.range((r, col10_idx)).value = current_val * 1.20
-                        changes_made += 1
-                        
+                row_vals = ws.range((r, 1), (r, last_col)).value
+                if not isinstance(row_vals, list):
+                    row_vals = [row_vals]
+                    
+                for i, val in enumerate(row_vals):
+                    if isinstance(val, str) and val.strip().lower() == 'quantity':
+                        # We found 'Quantity', now look at the next 5 columns to find its numeric values (Min/Max or Exact)
+                        for j in range(i + 1, min(i + 6, len(row_vals))):
+                            cell_val = row_vals[j]
+                            # Only scale valid demand values (ignore 1.0 which might be Minimum Split Ratio)
+                            if isinstance(cell_val, (int, float)) and cell_val > 1.0:
+                                ws.range((r, j + 1)).value = cell_val * 1.20
+                                changes_made += 1
+                        break
+        
         elif decision_index == 1:
-            # (Tu código original de Decrease Transport Costs...)
             ws = wb.sheets['Paths']
             last_col = ws.used_range.last_cell.column
             last_row = ws.used_range.last_cell.row
-            headers_row1 = ws.range((1, 1), (1, last_col)).value
-            headers1 = headers_row1 if isinstance(headers_row1, list) else [headers_row1]
-            col3_idx = headers1.index('Col 3') + 1 if 'Col 3' in headers1 else 3
-            col4_idx = headers1.index('Col 4') + 1 if 'Col 4' in headers1 else 4
             
             for r in range(2, last_row + 1):
-                val3 = ws.range((r, col3_idx)).value
-                if val3 in ['Cost per unit', 'Cost']:
-                    current_val = ws.range((r, col4_idx)).value
-                    if isinstance(current_val, (int, float)):
-                        ws.range((r, col4_idx)).value = current_val * 0.85
-                        changes_made += 1
-                            
+                row_vals = ws.range((r, 1), (r, last_col)).value
+                if not isinstance(row_vals, list):
+                    row_vals = [row_vals]
+                    
+                for i, val in enumerate(row_vals):
+                    if isinstance(val, str) and val.strip().lower() in ['cost', 'cost per unit', 'cost/unit']:
+                        if i + 1 < len(row_vals):
+                            current_val = row_vals[i + 1]
+                            if isinstance(current_val, (int, float)):
+                                ws.range((r, i + 2)).value = current_val * 0.85
+                                changes_made += 1
+                        break
+                        
         elif decision_index == 2:
-            # (Tu código original de Increase Safety Stock...)
             ws = wb.sheets['Inventory']
             last_col = ws.used_range.last_cell.column
             last_row = ws.used_range.last_cell.row
-            headers_row1 = ws.range((1, 1), (1, last_col)).value
-            headers1 = headers_row1 if isinstance(headers_row1, list) else [headers_row1]
-            col5_idx = headers1.index('Col 5') + 1 if 'Col 5' in headers1 else 5
-            col6_idx = headers1.index('Col 6') + 1 if 'Col 6' in headers1 else 6
             
             for r in range(2, last_row + 1):
-                if ws.range((r, col5_idx)).value == 'Safety stock':
-                    current_val = ws.range((r, col6_idx)).value
-                    if isinstance(current_val, (int, float)):
-                        ws.range((r, col6_idx)).value = current_val * 1.10
-                        changes_made += 1
+                row_vals = ws.range((r, 1), (r, last_col)).value
+                if not isinstance(row_vals, list):
+                    row_vals = [row_vals]
+                    
+                for i, val in enumerate(row_vals):
+                    if isinstance(val, str) and val.strip().lower() == 'safety stock':
+                        if i + 1 < len(row_vals):
+                            current_val = row_vals[i + 1]
+                            if isinstance(current_val, (int, float)):
+                                ws.range((r, i + 2)).value = current_val * 1.10
+                                changes_made += 1
+                        break
 
         # 4. SAFETY CHECK IF LOGIC FAILS
         if changes_made == 0:
