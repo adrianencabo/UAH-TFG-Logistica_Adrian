@@ -37,7 +37,3 @@ stateDiagram-v2
     OptFlow --> Redactar_Respuesta_Final: Caveman Style + Reasoning
     Redactar_Respuesta_Final --> [*]
 ```
-
-### ¿Qué decirle a tu profesor sobre esto?
-1. **Sobre el primer diagrama (LangGraph):** "Este es el diagrama arquitectónico real del código. Demuestra que hemos implementado un agente de última generación. En lugar de codificar paso a paso, creamos un bucle dinámico donde la IA razona y usa herramientas (`agent <-> tools`) libremente."
-2. **Sobre el segundo diagrama (Mermaid Lógico):** "Como el diagrama de LangGraph es tan minimalista por su naturaleza dinámica, aquí he desglosado el comportamiento lógico *emergente* que la IA ejecuta cuando se le pide la optimización completa."
