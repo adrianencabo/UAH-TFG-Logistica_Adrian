@@ -1,8 +1,5 @@
 # Diagrama Lógico del Flujo de Optimización (E2E)
 
-El diagrama generado por LangGraph (`__start__ -> agent <--> tools -> __end__`) es 100% correcto a nivel de **Arquitectura de Software**. Representa el paradigma "ReAct" (Reason + Act), donde el Agente no necesita estados estáticos porque el LLM actúa como un enrutador dinámico que salta entre pensar y ejecutar herramientas en un bucle infinito hasta que resuelve el problema. ¡Esa es la magia de la IA frente a la programación tradicional!
-
-Sin embargo, para que la memoria de tu TFG sea mucho más rica y tu profesor vea el trabajo interno que hace la IA, te recomiendo incluir también este **Diagrama de Flujo Lógico** que detalla qué ocurre *dentro* de ese bucle durante el Mega-Prompt E2E:
 
 ```mermaid
 stateDiagram-v2
