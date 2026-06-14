@@ -70,3 +70,8 @@ This document outlines the primary technical challenges encountered during the d
 ## 14. Scenario Duplication and Misidentification
 **Issue:** The API's `import_excel_existing` method does not explicitly return the ID of the newly created scenario in its JSON body, leading the agent to occasionally overwrite the wrong scenario or create duplicates.
 **Solution:** Modified the `upload_modified_scenario` function to parse the HTTP response headers. By extracting the exact ID from the `Location` header URL, the system accurately tracks the newly injected scenario, ensuring strict traceability for subsequent simulations.
+
+## 15. Hidden Excel Sheet Parsing (xlwings)
+**Issue:** Attempts to autonomously inject the user's prompt into the scenario's "Description" field failed silently. The script was unable to locate the `Scenario settings` sheet within the AnyLogistix Excel template.
+**Root Cause:** The `xlwings` library method `if 'SheetName' in wb.sheets` evaluated to `False` because the library requires explicit extraction of sheet names into a list before logical evaluation, especially for sheets generated as hidden or protected by external software.
+**Solution:** The validation logic in `alx_tools.py` was updated to iterate through `[sheet.name for sheet in wb.sheets]`. This successfully exposed the hidden metadata sheet, allowing the agent to inject the description and guaranteeing full traceability of AI-generated scenarios inside the AnyLogistix GUI.
