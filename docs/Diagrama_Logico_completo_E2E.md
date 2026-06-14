@@ -1,9 +1,5 @@
 # Diagrama Lógico Completo del Agente (Optimización E2E + RAG)
 
-El diagrama generado por LangGraph (`__start__ -> agent <--> tools -> __end__`) es 100% correcto a nivel de **Arquitectura de Software**. Representa el paradigma "ReAct" (Reason + Act), donde el Agente no necesita estados estáticos porque el LLM actúa como un enrutador dinámico que salta entre pensar y ejecutar herramientas en un bucle infinito hasta que resuelve el problema.
-
-Para que la memoria de tu TFG muestre el verdadero poder de tu Chatbot, este **Diagrama de Flujo Lógico** detalla el comportamiento interno de la IA, separando las dos grandes funcionalidades principales que has implementado: la **Consulta de Teoría (RAG)** y la **Optimización Autónoma (E2E)**.
-
 ```mermaid
 stateDiagram-v2
     [*] --> Recibir_Prompt_del_Usuario
