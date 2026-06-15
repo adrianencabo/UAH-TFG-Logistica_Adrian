@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 import shutil
@@ -206,16 +207,22 @@ def analyze_kpis(consolidated_excel_path: str) -> str:
         
     summary = []
     try:
+        import pandas as pd
         xls = pd.ExcelFile(consolidated_excel_path)
         
         for sheet in xls.sheet_names:
             try:
                 df = pd.read_excel(xls, sheet_name=sheet)
                 
-                # Special parsing for ALX dashboards (which have "Statistics name", "Time", "Value")
+                # Special parsing for ALX dashboards
                 if 'Statistics name' in df.values:
-                    # Find the header row
                     header_row_idx = df[df.eq('Statistics name').any(axis=1)].index[0]
+                    
+                    display_type = "Unknown"
+                    if 'Display type' in df.values:
+                        disp_idx = df[df.eq('Display type').any(axis=1)].index[0]
+                        display_type = df.iloc[disp_idx, 1]
+                        
                     clean_df = df.iloc[header_row_idx+1:].copy()
                     clean_df.columns = df.iloc[header_row_idx]
                     
@@ -223,15 +230,20 @@ def analyze_kpis(consolidated_excel_path: str) -> str:
                         clean_df['Value'] = pd.to_numeric(clean_df['Value'], errors='coerce')
                         sheet_summary = [f"--- Dashboard: {sheet} ---"]
                         
-                        grouped = clean_df.groupby('Statistics name')['Value'].agg(['mean', 'sum']).reset_index()
+                        grouped = clean_df.groupby('Statistics name')['Value']
                         
                         revenue_sum = 0
                         cost_sum = 0
                         
-                        for _, row in grouped.iterrows():
-                            stat_name = str(row['Statistics name']).strip()
-                            avg_val = row['mean']
-                            sum_val = row['sum']
+                        for stat_name, group in grouped:
+                            stat_name = str(stat_name).strip()
+                            avg_val = group.mean()
+                            
+                            if str(display_type).strip() == 'Accumulative':
+                                sum_val = group.max()
+                            else:
+                                sum_val = group.sum()
+                                
                             sheet_summary.append(f"- {stat_name}: Average = {avg_val:.2f}, Total Sum = {sum_val:.2f}")
                             
                             if stat_name.lower() == 'revenue':
@@ -246,36 +258,43 @@ def analyze_kpis(consolidated_excel_path: str) -> str:
                         summary.extend(sheet_summary)
                         continue
                         
-                # Fallback for generic numeric columns
-                for col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                    
-                numeric_cols = df.select_dtypes(include='number').columns
-                if not numeric_cols.empty:
-                    valid_metrics_found = False
-                    sheet_summary = [f"--- Dashboard: {sheet} ---"]
-                    
-                    for col in numeric_cols:
-                        if str(col).lower() in ['id', 'iteration', 'replication', 'period']:
-                            continue
-                            
-                        if not df[col].isna().all():
-                            avg_val = df[col].mean()
-                            sum_val = df[col].sum()
-                            sheet_summary.append(f"- Column {col}: Average = {avg_val:.2f}, Total Sum = {sum_val:.2f}")
-                            valid_metrics_found = True
-                            
-                    if valid_metrics_found:
-                        summary.extend(sheet_summary)
             except Exception as e:
                 pass
                 
-        return "\n".join(summary) if summary else "No numeric KPIs found."
+            # Fallback for generic numeric columns
+            for col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+            numeric_cols = df.select_dtypes(include='number').columns
+            if not numeric_cols.empty:
+                valid_metrics_found = False
+                sheet_summary = [f"--- Dashboard: {sheet} ---"]
+                
+                for col in numeric_cols:
+                    if str(col).lower() in ['id', 'iteration', 'replication', 'period']:
+                        continue
+                        
+                    if not df[col].isna().all():
+                        avg_val = df[col].mean()
+                        sum_val = df[col].sum()
+                        sheet_summary.append(f"- Column {col}: Average = {avg_val:.2f}, Total Sum = {sum_val:.2f}")
+                        valid_metrics_found = True
+                        
+                if valid_metrics_found:
+                    summary.extend(sheet_summary)
+                    
     except Exception as e:
-        return f"Error analyzing KPIs: {e}"
+        return f"Error extracting KPIs: {str(e)}"
+        
+    if not summary:
+        return "No valid KPIs found in the results file."
+        
+    return "\n".join(summary)
+
+
 
 @tool
-def modify_scenario_excel(original_excel_path: str, decision_index: int, new_scenario_name: str) -> str:
+def modify_scenario_excel(original_excel_path: str, decision_index: int, new_scenario_name: str, prompt_summary: str = "") -> str:
     """
     Applies an AI decision to modify an existing scenario Excel file using Microsoft Excel (xlwings).
     
@@ -286,6 +305,7 @@ def modify_scenario_excel(original_excel_path: str, decision_index: int, new_sce
             1 = Decrease Transport Costs by 15%
             2 = Increase Safety Stock by 10%
         new_scenario_name (str): The name of the new scenario. Used for the output file name.
+        prompt_summary (str): Short summary of the user's prompt to store as description.
         
     Returns:
         str: The absolute path to the modified Excel file, or an error message.
@@ -313,10 +333,19 @@ def modify_scenario_excel(original_excel_path: str, decision_index: int, new_sce
     # 3. SILENCE POP-UPS THAT FREEZE THE BOT
     app.display_alerts = False 
     app.screen_updating = False
-    
+        
     try:
         wb = app.books.open(modified_excel_path)
         changes_made = 0 # Inicializamos
+        
+        # --- Inject Description ---
+        if 'Scenario settings' in [s.name for s in wb.sheets]:
+            ws_settings = wb.sheets['Scenario settings']
+            for r in range(1, 10):
+                if ws_settings.range((r, 1)).value == 'Description':
+                    desc_val = f"Modified via AI Agent. Decision {decision_index}. User Prompt: {prompt_summary}"
+                    ws_settings.range((r, 2)).value = desc_val
+                    break
         
         if decision_index == 0:
             ws = wb.sheets['Demand']
