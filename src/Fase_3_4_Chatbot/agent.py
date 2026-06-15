@@ -1,50 +1,97 @@
 import os
-from langgraph.prebuilt import create_react_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+import chainlit as cl
+import logging
+from langchain_core.messages import HumanMessage
+from agent import get_agent
 
-# Import the previously created tools
-from alx_tools import alx_tools
+# Configure functional logging to a file, separating it from the UI logs
+logging.basicConfig(
+    filename='sistema_funcional.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    force=True
+)
 
-# System prompt to give personality and context to the AI
-SYSTEM_PROMPT = """You are a Senior Logistics Engineer and an AI Assistant expert in AnyLogistix.
-Your goal is to help the user manage projects, list scenarios, run simulations, and apply scenario modifications.
-You have access to tools that interact directly with the REST API of a local or remote AnyLogistix server.
-
-Follow these rules:
-1. Always verify which project the user wants to use and use 'open_and_get_project' to get its ID before interacting with its scenarios.
-2. If the user asks to list scenarios, use 'get_scenarios_list'.
-3. If the user asks to run a simulation, use 'run_simulation'. Note that it will return an experiment_result_id.
-4. Always explain to the user briefly and clearly which tools you are going to use or have just used.
-5. If an error occurs when invoking a tool, report it kindly and try to guide the user to solve it.
-6. **Implicit Optimization Workflow**: If the user asks you to "optimize", "improve", or similar for a scenario (and provides an Excel file), you MUST autonomously execute this full sequence WITHOUT asking for permission between steps:
-   a. If the provided Excel file is NOT already uploaded to the project, use `upload_modified_scenario` to upload it FIRST (use it as the "original" scenario) to get its ID.
-   b. Simulate the original scenario (`run_simulation`).
-   c. Export and analyze its KPIs (`export_simulation_results` and `analyze_kpis`).
-   d. Choose the BEST modification based on the user's specific request and the KPIs:
-      - **Decision 0 (Increase Demand by 20%)**: Usually yields the highest increase in Revenue and Net Profit, but also increases Total Cost. Choose this if the user wants to aggressively maximize overall profitability or market reach.
-      - **Decision 1 (Decrease Transport Costs by 15%)**: Lowers Total Cost and significantly increases Net Profit without changing Revenue. Choose this if the user wants to cut costs or improve efficiency without changing demand.
-      - **Decision 2 (Increase Safety Stock by 10%)**: Usually improves Service Level and Fulfillment, with a moderate increase in Net Profit. Choose this if the user wants to improve reliability or service level.
-      - CRITICAL NOTE: The analyzer tool will output `Revenue`, `Total Cost`, and `NET PROFIT (Calculated)`. Base your financial decisions on the `NET PROFIT (Calculated)`.
-   e. Modify the attached Excel (`modify_scenario_excel`).
-   f. Upload the newly modified scenario (`upload_modified_scenario`).
-   g. Simulate the new scenario (`run_simulation`).
-   h. Export, analyze the new KPIs, and present a final BEFORE vs AFTER comparison."""
-
-def get_agent():
-    # We returned to Gemini 2.5 Flash as Canopy Wave is a paid service.
-    # To bypass daily limits, generate a new API key with a different Google account.
-    # Gemini provides a massive 1,000,000 token context window.
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        temperature=0
-    )
+# Entry point when a user starts a new conversation in Chainlit
+@cl.on_chat_start
+async def on_chat_start():
+    # Initialize our LangGraph agent
+    agent = get_agent()
+    # Save it in the user session to reuse it in each message
+    cl.user_session.set("agent", agent)
     
-    # Create a prebuilt ReAct agent from LangGraph.
-    # This agent automatically manages the "Thought -> Action (Tool) -> Observation -> Response" loop.
-    agent_executor = create_react_agent(
-        llm, 
-        tools=alx_tools,
-        state_modifier=SYSTEM_PROMPT
-    )
+    # Initialize an empty list to store message history
+    cl.user_session.set("messages", [])
     
-    return agent_executor
+    # Welcome message
+    await cl.Message(
+        content="""Hello! 👋 I am your Intelligent AnyLogistix Assistant powered by Google Gemini.
+
+I can help you to:
+📦 **Phase 1**: Open projects, explore scenarios, run simulations, and export dashboard results.
+⚙️ **Phase 2**: Analyze simulation KPIs and autonomously modify scenarios (like increasing demand) to improve performance.
+📚 **Phase 3 (RAG)**: Answer theoretical logistics questions or AnyLogistix feature queries by reading the internal knowledge base.
+
+To get started, you can ask me something like:
+- *"What is the bullwhip effect?"* (RAG)
+- *"What scenarios are available?"* (Phase 1)
+- *"Simulate the Cold Chain scenario and modify it to improve profit"* (Phase 2)
+
+How can I help you today?"""
+    ).send()
+
+# This function runs every time the user sends a message
+@cl.on_message
+async def on_message(message: cl.Message):
+    agent = cl.user_session.get("agent")
+    messages = cl.user_session.get("messages")
+    
+    
+    # Process uploaded files
+    content = message.content
+    if message.elements:
+        file_paths = []
+        for element in message.elements:
+            # We check if it's an Excel file (by mime or name). Sometimes Chainlit misidentifies xlsx as zip.
+            if element.name.endswith(".xlsx") or element.name.endswith(".xls") or element.name.endswith(".zip") or "excel" in element.mime.lower() or "spreadsheet" in element.mime.lower() or "zip" in element.mime.lower():
+                file_paths.append(element.path)
+        
+        if file_paths:
+            content += f"\n\n[System Note: The user has uploaded the following Excel file(s) for you to process. You can use their absolute paths: {', '.join(file_paths)}]"
+            
+    # Add the new user message to the history
+    messages.append(HumanMessage(content=content))
+    
+    # Show a temporary "thinking" message in the UI
+    ui_msg = cl.Message(content="Thinking and executing tools...", author="Assistant")
+    await ui_msg.send()
+    
+    try:
+        # We need a unique thread_id per user session to use LangGraph MemorySaver
+        session_id = cl.user_session.get("id")
+        
+        # Log the user request functionally
+        logging.info(f"Session {session_id} - User input received.")
+        
+        # Execute the agent asynchronously passing the history and the thread_id
+        result = await agent.ainvoke(
+            {"messages": messages},
+            config={"configurable": {"thread_id": session_id}}
+        )
+        
+        logging.info(f"Session {session_id} - Agent execution successful.")
+        
+        # The result contains the updated history (includes internal tool steps and LLM response)
+        updated_messages = result["messages"]
+        cl.user_session.set("messages", updated_messages)
+        
+        # The final AI response is the last message in the list
+        final_answer = updated_messages[-1].content
+        
+        # Update the temporary message with the actual response
+        ui_msg.content = final_answer
+        await ui_msg.update()
+        
+    except Exception as e:
+        ui_msg.content = f"⚠️ **An error occurred in the Agent:**\n```python\n{str(e)}\n```"
+        await ui_msg.update()
