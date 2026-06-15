@@ -1,7 +1,16 @@
 import os
 import chainlit as cl
+import logging
 from langchain_core.messages import HumanMessage
 from agent import get_agent
+
+# Configure functional logging to a file, separating it from the UI logs
+logging.basicConfig(
+    filename='sistema_funcional.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    force=True
+)
 
 # Entry point when a user starts a new conversation in Chainlit
 @cl.on_chat_start
@@ -58,8 +67,19 @@ async def on_message(message: cl.Message):
     await ui_msg.send()
     
     try:
-        # Execute the agent asynchronously passing the history
-        result = await agent.ainvoke({"messages": messages})
+        # We need a unique thread_id per user session to use LangGraph MemorySaver
+        session_id = cl.user_session.get("id")
+        
+        # Log the user request functionally
+        logging.info(f"Session {session_id} - User input received.")
+        
+        # Execute the agent asynchronously passing the history and the thread_id
+        result = await agent.ainvoke(
+            {"messages": messages},
+            config={"configurable": {"thread_id": session_id}}
+        )
+        
+        logging.info(f"Session {session_id} - Agent execution successful.")
         
         # The result contains the updated history (includes internal tool steps and LLM response)
         updated_messages = result["messages"]
