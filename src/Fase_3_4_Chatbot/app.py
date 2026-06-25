@@ -73,10 +73,13 @@ async def on_message(message: cl.Message):
         # Log the user request functionally
         logging.info(f"Session {session_id} - User input received.")
         
-        # Execute the agent asynchronously passing the history and the thread_id
+        # Create a callback handler so Chainlit can render the intermediate steps
+        cb = cl.AsyncLangchainCallbackHandler()
+        
+        # Execute the agent asynchronously passing the history, thread_id, and callbacks
         result = await agent.ainvoke(
             {"messages": messages},
-            config={"configurable": {"thread_id": session_id}}
+            config={"configurable": {"thread_id": session_id}, "callbacks": [cb]}
         )
         
         logging.info(f"Session {session_id} - Agent execution successful.")
