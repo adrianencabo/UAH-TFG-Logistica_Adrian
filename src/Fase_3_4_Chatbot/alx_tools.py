@@ -336,7 +336,7 @@ def modify_scenario_excel(original_excel_path: str, decision_index: int, new_sce
         
     try:
         wb = app.books.open(modified_excel_path)
-        changes_made = 0 # Inicializamos
+        changes_made = 0 # Initialize
         
         # --- Inject Description ---
         if 'Scenario settings' in [s.name for s in wb.sheets]:
